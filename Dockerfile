@@ -48,6 +48,8 @@ RUN npm install --global --omit=dev tsx
 RUN mkdir -p /paperclip \
     && chown -R node:node /app /paperclip /wrapper
 
+USER node
+
 # Railway sets PORT at runtime and this process binds to it.
 # Entrypoint runs as root, fixes /paperclip volume permissions, then execs as node.
 EXPOSE 3100
