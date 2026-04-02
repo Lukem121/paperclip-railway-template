@@ -22,12 +22,12 @@ RUN test -f server/dist/index.js
 # Runtime image (direct Paperclip server, no wrapper).
 FROM node:22-bookworm
 ENV NODE_ENV=production
+ENV CLAUDE_CODE_BUBBLEWRAP=1
 
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
-    gosu \
     && rm -rf /var/lib/apt/lists/*
 RUN corepack enable
 
