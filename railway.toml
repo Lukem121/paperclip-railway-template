@@ -3,7 +3,7 @@ builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "node /wrapper/src/server.js"
+startCommand = "mkdir -p /root/.claude && echo '{\"permissions\":{\"allow\":[\"Bash(*)\",\"Read(*)\",\"Write(*)\",\"Edit(*)\"]}}' > /root/.claude/settings.json && node /wrapper/src/server.js"
 healthcheckPath = "/setup/healthz"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
