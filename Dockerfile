@@ -23,11 +23,21 @@ RUN test -f server/dist/index.js
 FROM node:22-bookworm
 ENV NODE_ENV=production
 ENV CLAUDE_CODE_BUBBLEWRAP=1
+# Match upstream production image defaults (paperclipai/paperclip Dockerfile) so
+# agent tooling, OpenCode, and config paths behave the same in containers.
+ENV HOME=/paperclip \
+    PAPERCLIP_INSTANCE_ID=default \
+    PAPERCLIP_CONFIG=/paperclip/instances/default/config.json \
+    OPENCODE_ALLOW_ALL_MODELS=true
 
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
+    git \
+    jq \
+    openssh-client \
+    ripgrep \
     && rm -rf /var/lib/apt/lists/*
 RUN corepack enable
 

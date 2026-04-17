@@ -91,8 +91,8 @@ Paperclip is **cloned while the Docker image is built**, not at container start.
 
 | Where | What to do |
 |-------|------------|
-| **Railway** | Add a service variable **`PAPERCLIP_REF`** with a valid tag or branch from [paperclipai/paperclip](https://github.com/paperclipai/paperclip) (for example `v2026.325.0`). Railway passes service variables into the build when the Dockerfile declares matching `ARG` lines; see [Using variables at build time](https://docs.railway.com/guides/dockerfiles#using-variables-at-build-time). |
-| **Local `docker build`** | `docker build --build-arg PAPERCLIP_REF=v2026.325.0 -t paperclip-railway-template .` |
+| **Railway** | Add a service variable **`PAPERCLIP_REF`** with a valid tag or branch from [paperclipai/paperclip](https://github.com/paperclipai/paperclip) (often the same value as the default `PAPERCLIP_REF` in this repo’s `Dockerfile`). Railway passes service variables into the build when the Dockerfile declares matching `ARG` lines; see [Using variables at build time](https://docs.railway.com/guides/dockerfiles#using-variables-at-build-time). |
+| **Local `docker build`** | `docker build --build-arg PAPERCLIP_REF=v2026.416.0 -t paperclip-railway-template .` |
 
 If you omit `PAPERCLIP_REF`, the default in the Dockerfile is used.
 
