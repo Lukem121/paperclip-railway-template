@@ -348,9 +348,15 @@ proxy.on("proxyReq", (proxyReq, req) => {
 });
 
 proxy.on("error", (_err, req, res) => {
-  if (res && !res.headersSent) {
+  if (!res) return;
+  // WebSocket upgrade errors pass a socket, not an http.ServerResponse — no writeHead.
+  if (typeof res.writeHead === "function" && !res.headersSent) {
     res.writeHead(503, { "content-type": "application/json" });
     res.end(JSON.stringify({ ok: false, error: "paperclip_unavailable", path: req.url }));
+    return;
+  }
+  if (typeof res.destroy === "function") {
+    res.destroy();
   }
 });
 
