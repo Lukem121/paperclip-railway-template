@@ -33,8 +33,8 @@ https://railway.com/deploy/KJZc89?referralCode=uXzB-u&utm_medium=integration&utm
 1. Open your app’s public URL (e.g. `https://your-app.up.railway.app`).
 2. Go to **`/setup`** (e.g. `https://your-app.up.railway.app/setup`).
 3. (Optional) If you want AI agents immediately, complete Step 1 on setup:
-   - set `OPENAI_API_KEY` and/or `ANTHROPIC_API_KEY` in Railway variables
-   - run Codex login from setup (Claude uses `ANTHROPIC_API_KEY` directly)
+   - for Claude Code, set `CLAUDE_CODE_OAUTH_TOKEN` in Railway variables — see [Claude agents on your subscription](#claude-agents-on-your-subscription). No Anthropic API key needed.
+   - for Codex, set `OPENAI_API_KEY` in Railway variables and run Codex login from setup
 4. Click **“Generate admin invite URL”**. The page will show a one-time invite link.
 5. Open that link in your browser and complete sign-up. That account is the first admin.
 6. From then on, use the app at **`/`** — log in with that admin (or with users you invite later).
@@ -60,11 +60,46 @@ Set these on the **Paperclip** service in Railway (template editor or service Va
 
 Optional (for AI agents):
 
+- **`CLAUDE_CODE_OAUTH_TOKEN`** — Recommended for Claude agents. A long-lived subscription token that lets the `claude_local` adapter bill against your Claude subscription instead of an API key. See [Claude agents on your subscription](#claude-agents-on-your-subscription).
+
+- **`ANTHROPIC_API_KEY`** — Alternative Claude auth using API billing. **Mutually exclusive with `CLAUDE_CODE_OAUTH_TOKEN`** — leave it unset if you want subscription auth.
+
 - **`OPENAI_API_KEY`** — If set, the wrapper runs Codex login at startup so agents using the Codex adapter work. You can also run Codex login from the setup page. Without it, the app and dashboard work; agents that use Codex will fail until the key is set and login is run. Also used by OpenCode when you add OpenAI-compatible providers.
 
-- **`ANTHROPIC_API_KEY`** — Used by the Claude adapter. Optional; add when you want Claude-based agents.
-
 - **`GEMINI_API_KEY`** — Optional; used by Gemini CLI / Gemini-backed agents.
+
+### Claude agents on your subscription
+
+The `claude_local` adapter can authenticate with your Claude Code subscription, so this template needs **no Anthropic API key at all**.
+
+**1. Mint a subscription token.** On any machine already signed in to Claude Code:
+
+```bash
+claude setup-token
+```
+
+You can also do this inside the deployed container — `railway ssh`, then run the same command. The image sets `HOME=/paperclip`, which is the mounted volume.
+
+**2. Set it in Railway.** Add a service variable on the **Paperclip** service:
+
+```
+CLAUDE_CODE_OAUTH_TOKEN=<the token printed above>
+```
+
+Redeploy. `/setup` will show **“Claude: subscription token set”**, and a `claude_local` agent’s **Test Environment** will report `claude_oauth_token_configured`.
+
+**Leave `ANTHROPIC_API_KEY` unset.** An API key takes precedence over subscription credentials in the Claude CLI, and from Paperclip `v2026.824.0` on, a stored subscription binding together with a non-empty `ANTHROPIC_API_KEY` is rejected as `CLAUDE_OAUTH_CREDENTIAL_CONFLICT`.
+
+**Alternative — sign in on the volume.** Instead of a token variable you can log in inside the container:
+
+```bash
+railway ssh
+claude login
+```
+
+Credentials land in `/paperclip/.claude/.credentials.json`, which is on the Railway volume, so the login survives redeploys. `/setup` reports this as **“Claude: signed in on this container”**.
+
+**Note on Paperclip’s own in-app Claude sign-in.** Upstream added a “Sign in to Claude” button to the new-agent page in `v2026.824.0`. It drives `claude setup-token` through a pseudo-terminal inside a *sandbox* execution target and is hard-gated on one — a `local` or `ssh` environment is rejected. This template runs a single container with no sandbox provider, so that button does not appear here. The two methods above are the supported paths.
 
 ### OpenCode on this template
 

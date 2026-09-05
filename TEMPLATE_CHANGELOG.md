@@ -1,5 +1,9 @@
 # Template Changelog
 
+## 2026-09-05
+
+- Added: Claude agents can authenticate with a Claude subscription instead of `ANTHROPIC_API_KEY`. Set `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`) as a service variable, or run `claude login` in the container over `railway ssh` — that writes to `/paperclip/.claude`, which is on the volume. `/setup` now reports the actual Claude auth mode instead of only checking for an API key, and flags an API key set alongside subscription credentials.
+
 ## 2026-08-02
 
 - Changed: Paperclip pin `v2026.416.0` → `v2026.722.0` (latest stable at bump time; routine upstream uptake across ~3 months of releases). **Upgrade note:** upstream releases in this range add many additive DB migrations (including Connections v3 / MCP gateway foundations); they run automatically on startup. Existing instances that set a static `PAPERCLIP_API_KEY` to override the harness run token should stop — that override no longer applies (see [v2026.722.0 upgrade guide](https://github.com/paperclipai/paperclip/releases/tag/v2026.722.0)).

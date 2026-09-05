@@ -114,6 +114,7 @@ function setupHtml() {
       .adapter-status { background:#1a1a1a; border:1px solid #2d2d2d; border-radius:8px; padding:10px 14px; font-size:13px; display:flex; align-items:center; gap:8px; }
       .adapter-status.status-ok { border-left:3px solid #22c55e; color:#86efac; }
       .adapter-status.status-pending { border-left:3px solid #525252; color:#9ca3af; }
+      .adapter-status.status-warn { border-left:3px solid #f59e0b; color:#fcd34d; }
       .adapter-status .status-check { font-size:16px; line-height:1; }
     </style>
   </head>
@@ -125,12 +126,20 @@ function setupHtml() {
 
       <div class="step">
         <div class="step-num">Step 1 — AI adapters (optional)</div>
-        <div class="step-title">Codex &amp; Claude (OpenAI &amp; Anthropic)</div>
-        <p class="muted" style="margin:0 0 10px 0; font-size:13px;">Only needed if you want agents to run. Set <code style="background:#1a1a1a; padding:2px 6px; border-radius:4px;">OPENAI_API_KEY</code> and/or <code style="background:#1a1a1a; padding:2px 6px; border-radius:4px;">ANTHROPIC_API_KEY</code> in Railway variables. Codex requires a one-time login below; Claude uses the env key automatically. You can skip this and add keys later — the app works without them; agents will fail until keys are set.</p>
+        <div class="step-title">Claude Code &amp; Codex</div>
+        <p class="muted" style="margin:0 0 10px 0; font-size:13px;">Only needed if you want agents to run. Claude Code works with your <strong>Claude subscription</strong> — no Anthropic API key required. You can skip this and set it up later; the app works without it, but agents will fail until an adapter is authenticated.</p>
         <div class="adapter-statuses">
-          <div class="adapter-status status-pending" id="codexStatusWrap"><span class="status-check" id="codexCheck">○</span><span id="codexStatus">Codex: checking...</span></div>
           <div class="adapter-status status-pending" id="claudeStatusWrap"><span class="status-check" id="claudeCheck">○</span><span id="claudeStatus">Claude: checking...</span></div>
+          <div class="adapter-status status-pending" id="codexStatusWrap"><span class="status-check" id="codexCheck">○</span><span id="codexStatus">Codex: checking...</span></div>
         </div>
+        <details id="claudeHelp" style="margin-bottom:12px;">
+          <summary style="cursor:pointer; font-size:13px; color:#9ca3af;">How to connect your Claude subscription</summary>
+          <p class="muted" style="margin:10px 0 6px 0; font-size:13px;">On a machine already signed in to Claude Code, mint a long-lived subscription token:</p>
+          <pre>claude setup-token</pre>
+          <p class="muted" style="margin:10px 0 6px 0; font-size:13px;">Then add the printed token as a Railway service variable and redeploy:</p>
+          <pre>CLAUDE_CODE_OAUTH_TOKEN=&lt;token&gt;</pre>
+          <p class="muted" style="margin:10px 0 0 0; font-size:13px;">You can also run <code>claude setup-token</code> inside this container over <code>railway ssh</code>. Leave <code>ANTHROPIC_API_KEY</code> unset — an API key overrides subscription auth, and Paperclip rejects the two together.</p>
+        </details>
         <div class="row" id="codexButtonRow" style="margin-bottom:8px;"><button id="codexLogin" type="button">Run Codex login</button></div>
         <pre id="codexOutput" style="margin-top:10px; display:none;">-</pre>
       </div>
@@ -168,6 +177,7 @@ function setupHtml() {
       const claudeStatusWrap = document.getElementById("claudeStatusWrap");
       const claudeCheck = document.getElementById("claudeCheck");
       const claudeStatusEl = document.getElementById("claudeStatus");
+      const claudeHelp = document.getElementById("claudeHelp");
 
       async function refreshHealth() {
         try {
@@ -200,14 +210,29 @@ function setupHtml() {
               codexStatusEl.textContent = "Codex: Set OPENAI_API_KEY in Railway, then run login";
             }
           }
-          if (cl.anthropicApiKeySet) {
+          if (cl.conflict) {
+            claudeStatusWrap.className = "adapter-status status-warn";
+            claudeCheck.textContent = "!";
+            claudeStatusEl.textContent =
+              "Claude: ANTHROPIC_API_KEY is set alongside subscription credentials — unset the API key, it overrides the subscription";
+          } else if (cl.mode === "oauth_token") {
             claudeStatusWrap.className = "adapter-status status-ok";
             claudeCheck.textContent = "✓";
-            claudeStatusEl.textContent = "Claude: API key set";
+            claudeStatusEl.textContent = "Claude: subscription token set (CLAUDE_CODE_OAUTH_TOKEN)";
+          } else if (cl.mode === "subscription_login") {
+            claudeStatusWrap.className = "adapter-status status-ok";
+            claudeCheck.textContent = "✓";
+            claudeStatusEl.textContent = "Claude: signed in on this container (credentials on the volume)";
+          } else if (cl.mode === "api_key") {
+            claudeStatusWrap.className = "adapter-status status-ok";
+            claudeCheck.textContent = "✓";
+            claudeStatusEl.textContent = "Claude: ANTHROPIC_API_KEY set (API billing, not your subscription)";
           } else {
             claudeStatusWrap.className = "adapter-status status-pending";
             claudeCheck.textContent = "○";
-            claudeStatusEl.textContent = "Claude: Set ANTHROPIC_API_KEY in Railway for Claude-based agents";
+            claudeStatusEl.textContent =
+              "Claude: not connected — expand the guide below to connect your subscription";
+            claudeHelp.open = true;
           }
         } catch {
           codexStatusWrap.className = "adapter-status status-pending";
@@ -389,8 +414,25 @@ function getCodexStatus() {
 }
 
 function getClaudeStatus() {
+  const configDir =
+    process.env.CLAUDE_CONFIG_DIR || path.join(process.env.HOME || "/paperclip", ".claude");
+  const subscriptionLogin =
+    fs.existsSync(path.join(configDir, ".credentials.json")) ||
+    fs.existsSync(path.join(configDir, "credentials.json"));
+  const oauthTokenSet = Boolean(process.env.CLAUDE_CODE_OAUTH_TOKEN?.trim());
   const anthropicApiKeySet = Boolean(process.env.ANTHROPIC_API_KEY?.trim());
-  return { anthropicApiKeySet };
+  // ANTHROPIC_API_KEY wins over subscription credentials in the Claude CLI, and
+  // Paperclip rejects a stored subscription binding alongside a non-empty key
+  // (CLAUDE_OAUTH_CREDENTIAL_CONFLICT). Surface that pairing as a conflict.
+  const conflict = anthropicApiKeySet && (oauthTokenSet || subscriptionLogin);
+  const mode = anthropicApiKeySet
+    ? "api_key"
+    : oauthTokenSet
+      ? "oauth_token"
+      : subscriptionLogin
+        ? "subscription_login"
+        : "none";
+  return { mode, oauthTokenSet, subscriptionLogin, anthropicApiKeySet, conflict, configDir };
 }
 
 app.get("/setup/api/codex-status", (_req, res) => {
