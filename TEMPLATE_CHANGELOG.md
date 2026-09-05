@@ -1,5 +1,9 @@
 # Template Changelog
 
+## 2026-09-05
+
+- Fixed: no init process in the container. The entrypoint ends in `exec`, so node ran as PID 1 and never reaped the orphaned `git`/`claude`/`esbuild` descendants that agent runs leave behind; they accumulated as zombies until the cgroup pid limit was reached and every `fork()` failed. `tini` is now PID 1, matching the upstream Paperclip production image.
+
 ## 2026-08-02
 
 - Changed: Paperclip pin `v2026.416.0` → `v2026.722.0` (latest stable at bump time; routine upstream uptake across ~3 months of releases). **Upgrade note:** upstream releases in this range add many additive DB migrations (including Connections v3 / MCP gateway foundations); they run automatically on startup. Existing instances that set a static `PAPERCLIP_API_KEY` to override the harness run token should stop — that override no longer applies (see [v2026.722.0 upgrade guide](https://github.com/paperclipai/paperclip/releases/tag/v2026.722.0)).

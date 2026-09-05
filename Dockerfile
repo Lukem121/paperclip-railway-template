@@ -39,6 +39,7 @@ RUN apt-get update \
     jq \
     openssh-client \
     ripgrep \
+    tini \
     && rm -rf /var/lib/apt/lists/*
 RUN corepack enable
 
@@ -62,5 +63,10 @@ RUN mkdir -p /paperclip \
 # Railway sets PORT at runtime and this process binds to it.
 # Entrypoint runs as root, fixes /paperclip volume permissions, then execs as node.
 EXPOSE 3100
-ENTRYPOINT ["/wrapper/entrypoint.sh"]
+# tini, not node, is PID 1. The entrypoint ends in `exec`, so without an init
+# node inherits PID 1 and never wait()s the orphans the kernel re-parents onto
+# it — agent runs spawn git/claude/esbuild/sh descendants that outlive their
+# leader, so they pile up as permanent zombies until the cgroup pid limit is
+# exhausted and every fork() in the container fails.
+ENTRYPOINT ["/usr/bin/tini", "--", "/wrapper/entrypoint.sh"]
 CMD ["node", "/wrapper/src/server.js"]
